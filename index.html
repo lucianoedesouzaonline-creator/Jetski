@@ -32,41 +32,45 @@
             letter-spacing: 1px;
         }
 
+        /* Container Principal do Topo (Flexível para mudar de direção em telas largas) */
         .painel-topo {
             display: flex;
-            gap: 10px;
+            gap: 12px;
             width: 100%;
-            max-width: 340px;
+            max-width: 400px;
             justify-content: center;
             align-items: center;
+            flex-wrap: wrap;
+            /* Permite que os elementos se acomodem se o espaço mudar */
         }
 
+        /* Bússola (Esquerda) */
         .bussola-container {
             position: relative;
-            width: 150px;
-            height: 150px;
-            border: 4px solid #4cc9f0;
+            width: 130px;
+            height: 130px;
+            border: 3px solid #4cc9f0;
             border-radius: 50%;
             display: flex;
             justify-content: center;
             align-items: center;
             background: rgba(28, 37, 65, 0.8);
-            box-shadow: 0 0 15px rgba(76, 201, 240, 0.3);
+            box-shadow: 0 0 10px rgba(76, 201, 240, 0.3);
             flex-shrink: 0;
         }
 
         #graus {
-            font-size: 30px;
+            font-size: 26px;
             font-weight: bold;
             color: #ffcc00;
         }
 
-        /* Caixa do Radar / Canvas Gráfico */
+        /* Radar de Trilha (Direita) */
         .radar-container {
-            width: 150px;
-            height: 150px;
+            width: 180px;
+            height: 180px;
             background: #1c2541;
-            border: 4px solid #3a4a7f;
+            border: 4px solid #4cc9f0;
             border-radius: 50%;
             position: relative;
             display: flex;
@@ -74,6 +78,7 @@
             align-items: center;
             overflow: hidden;
             flex-shrink: 0;
+            box-shadow: 0 0 15px rgba(76, 201, 240, 0.3);
         }
 
         canvas {
@@ -81,11 +86,46 @@
             height: 100%;
         }
 
+        /* Controles de Modo (Volta / Ida) */
+        .controles-trilha {
+            display: flex;
+            gap: 8px;
+            width: 100%;
+            max-width: 380px;
+        }
+
+        .btn-modo {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 13px;
+            cursor: pointer;
+            opacity: 0.6;
+        }
+
+        #btn-volta {
+            background-color: #581845;
+            color: #ffffff;
+        }
+
+        #btn-ida {
+            background-color: #ffcc00;
+            color: #0b132b;
+        }
+
+        .ativo {
+            opacity: 1 !important;
+            box-shadow: 0 0 8px #ffffff;
+        }
+
+        /* Card de Informações */
         .card-info {
             background-color: #1c2541;
             width: 100%;
-            max-width: 340px;
-            padding: 10px;
+            max-width: 380px;
+            padding: 12px;
             border-radius: 8px;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
             display: flex;
@@ -97,9 +137,9 @@
         .info-row {
             display: flex;
             justify-content: space-between;
-            font-size: 13px;
+            font-size: 14px;
             border-bottom: 1px solid #3a4a7f;
-            padding-bottom: 3px;
+            padding-bottom: 4px;
         }
 
         .info-row:last-child {
@@ -118,56 +158,57 @@
             text-align: right;
         }
 
-        /* Controles de Modo (Ida / Volta) */
-        .controles-trilha {
-            display: flex;
-            gap: 8px;
-            width: 100%;
-            max-width: 340px;
-        }
-
-        .btn-modo {
-            flex: 1;
-            padding: 8px;
-            border: none;
-            border-radius: 6px;
-            font-weight: bold;
-            font-size: 12px;
-            cursor: pointer;
-        }
-
-        #btn-ida {
-            background-color: #ffcc00;
-            color: #0b132b;
-        }
-
-        #btn-volta {
-            background-color: #581845;
-            color: #ffffff;
-            opacity: 0.6;
-        }
-
-        .ativo {
-            opacity: 1 !important;
-            box-shadow: 0 0 8px #ffffff;
-        }
-
+        /* Botão de Ativação */
         .btn-permissao {
             width: 100%;
-            max-width: 340px;
-            padding: 12px;
+            max-width: 380px;
+            padding: 14px;
             background-color: #4cc9f0;
             color: #0b132b;
             border: none;
             border-radius: 8px;
             font-weight: bold;
-            font-size: 15px;
+            font-size: 16px;
             cursor: pointer;
         }
 
         .btn-permissao:active {
             background-color: #3a86ff;
             color: #fff;
+        }
+
+        /* MEDIA QUERY PARA TABLETS OU TELAS LARGAS (Modo Paisagem / Tablet) */
+        @media (min-width: 600px) {
+            body {
+                justify-content: center;
+                gap: 15px;
+            }
+
+            .painel-topo {
+                max-width: 500px;
+                gap: 20px;
+            }
+
+            .bussola-container {
+                width: 160px;
+                height: 160px;
+            }
+
+            #graus {
+                font-size: 32px;
+            }
+
+            .radar-container {
+                width: 220px;
+                height: 220px;
+            }
+
+            /* Ajusta o canvas internamente se necessário via JS ou CSS */
+            .card-info,
+            .controles-trilha,
+            .btn-permissao {
+                max-width: 500px;
+            }
         }
     </style>
 </head>
@@ -185,27 +226,31 @@
             <div id="graus">--°</div>
         </div>
 
-        <!-- Radar Gráfico (Ida/Volta) -->
+        <!-- Radar Gráfico -->
         <div class="radar-container" title="Rastro Visual">
-            <canvas id="radarCanvas" width="150" height="150"></canvas>
+            <canvas id="radarCanvas" width="180" height="180"></canvas>
         </div>
     </div>
 
-    <!-- Botões de Alternância Ida / Volta -->
+    <!-- Botões de Alternância: Volta (Esquerda) / Ida (Direita) -->
     <div class="controles-trilha">
-        <button class="btn-modo ativo" id="btn-ida">MODO: IDA</button>
         <button class="btn-modo" id="btn-volta">MODO: VOLTA</button>
+        <button class="btn-modo ativo" id="btn-ida">MODO: IDA</button>
     </div>
 
-    <!-- Bloco de Dados do GPS e Sensores -->
+    <!-- Bloco de Dados do GPS, Horário e Sensores -->
     <div class="card-info">
+        <div class="info-row">
+            <span class="info-label">Horário:</span>
+            <span id="relogio" class="info-value">--:--:--</span>
+        </div>
         <div class="info-row">
             <span class="info-label">Direção:</span>
             <span id="direcao-card" class="info-value">Aguardando...</span>
         </div>
         <div class="info-row">
             <span class="info-label">Velocidade:</span>
-            <span id="velocidade" class="info-value">0.0 nós<br>0.0 km/h</span>
+            <span id="velocidade" class="info-value">0.0 nós / 0.0 km/h</span>
         </div>
         <div class="info-row">
             <span class="info-label">Latitude:</span>
@@ -226,6 +271,7 @@
         const velocidadeText = document.getElementById('velocidade');
         const latText = document.getElementById('lat');
         const lonText = document.getElementById('lon');
+        const relogioText = document.getElementById('relogio');
         const btnAtivar = document.getElementById('btn-ativar');
         const btnIda = document.getElementById('btn-ida');
         const btnVolta = document.getElementById('btn-volta');
@@ -233,12 +279,16 @@
         const canvas = document.getElementById('radarCanvas');
         const ctx = canvas.getContext('2d');
 
-        let modoAtual = 'ida'; // 'ida' ou 'volta'
+        let modoAtual = 'ida';
         let trilhaIda = [];
         let trilhaVolta = [];
-        let pontoInicial = null; // Referência 0,0 do radar
+        let pontoInicial = null;
 
-        // Alternar entre os botões de Ida e Volta
+        setInterval(() => {
+            const agora = new Date();
+            relogioText.innerText = agora.toTimeString().split(' ')[0];
+        }, 1000);
+
         btnIda.addEventListener('click', () => {
             modoAtual = 'ida';
             btnIda.classList.add('ativo');
@@ -257,24 +307,21 @@
             return direcoes[index % 8];
         }
 
-        // Desenhar o radar gráfico no Canvas
         function desenharRadar() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Fundo do radar e mira central
             ctx.fillStyle = '#1c2541';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             ctx.strokeStyle = '#3a4a7f';
             ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.arc(75, 75, 50, 0, Math.PI * 2);
+            ctx.arc(90, 90, 65, 0, Math.PI * 2);
             ctx.stroke();
 
-            // Desenhar Trilha de IDA (Amarela)
             if (trilhaIda.length > 1) {
                 ctx.strokeStyle = '#ffcc00';
-                ctx.lineWidth = 3;
+                ctx.lineWidth = 4;
                 ctx.beginPath();
                 trilhaIda.forEach((p, index) => {
                     if (index === 0) ctx.moveTo(p.x, p.y);
@@ -283,10 +330,9 @@
                 ctx.stroke();
             }
 
-            // Desenhar Trilha de VOLTA (Vinho / Vermelho Escuro)
             if (trilhaVolta.length > 1) {
                 ctx.strokeStyle = '#800020';
-                ctx.lineWidth = 3;
+                ctx.lineWidth = 4;
                 ctx.beginPath();
                 trilhaVolta.forEach((p, index) => {
                     if (index === 0) ctx.moveTo(p.x, p.y);
@@ -295,18 +341,15 @@
                 ctx.stroke();
             }
 
-            // Ponto central de partida (Origem)
             ctx.fillStyle = '#4cc9f0';
             ctx.beginPath();
-            ctx.arc(75, 75, 4, 0, Math.PI * 2);
+            ctx.arc(90, 90, 5, 0, Math.PI * 2);
             ctx.fill();
         }
 
-        // Ativar sensores e geolocalização
         btnAtivar.addEventListener('click', () => {
             btnAtivar.innerText = 'Ativando...';
 
-            // 1. Orientação / Bússola
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                 DeviceOrientationEvent.requestPermission().then(response => {
                     if (response === 'granted') iniciarBussola();
@@ -315,7 +358,6 @@
                 iniciarBussola();
             }
 
-            // 2. GPS e Conversão Gráfica
             if ('geolocation' in navigator) {
                 navigator.geolocation.watchPosition((position) => {
                     const lat = position.coords.latitude;
@@ -328,37 +370,30 @@
                     if (speed_ms !== null && speed_ms > 0) {
                         const nos = (speed_ms * 1.94384).toFixed(1);
                         const kmh = (speed_ms * 3.6).toFixed(1);
-                        velocidadeText.innerHTML = `${nos} nós<br>${kmh} km/h`;
+                        velocidadeText.innerText = `${nos} nós / ${kmh} km/h`;
                     } else {
-                        velocidadeText.innerHTML = "0.0 nós<br>0.0 km/h";
+                        velocidadeText.innerText = "0.0 nós / 0.0 km/h";
                     }
 
-                    // Definir o primeiro ponto como a origem do radar (centro 75,75)
                     if (!pontoInicial) {
                         pontoInicial = { lat: lat, lon: lon };
                     }
 
-                    // Calcular deslocamento em metros aproximados em relação ao ponto inicial
-                    // 1 grau de latitude ~ 111000 metros. Fator de escala adaptado para o radar.
                     const deltaLat = (lat - pontoInicial.lat) * 111000;
                     const deltaLon = (lon - pontoInicial.lon) * 111000 * Math.cos(lat * Math.PI / 180);
 
-                    // Mapear para coordenadas do Canvas (Centro em 75,75 e fator de escala de zoom)
-                    // Invertemos o Y porque no canvas o eixo Y cresce para baixo
-                    const escala = 2.0; // Ajuste o zoom do rastro se necessário
-                    const xCoord = 75 + (deltaLon * escala);
-                    const yCoord = 75 - (deltaLat * escala);
+                    const escala = 2.0;
+                    const xCoord = 90 + (deltaLon * escala);
+                    const yCoord = 90 - (deltaLat * escala);
 
                     const novoPontoCanvas = { x: xCoord, y: yCoord };
 
-                    // Separar entre IDAL e VOLTA com base no botão selecionado
                     if (modoAtual === 'ida') {
                         trilhaIda.push(novoPontoCanvas);
                     } else {
                         trilhaVolta.push(novoPontoCanvas);
                     }
 
-                    // Atualizar desenho do radar
                     desenharRadar();
 
                 }, (error) => {
@@ -397,7 +432,6 @@
             }
         }
 
-        // Service Worker
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
         }
