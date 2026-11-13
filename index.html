@@ -12,13 +12,13 @@
             background-color: #0b132b;
             color: #ffffff;
             margin: 0;
-            padding: 20px;
+            padding: 15px;
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh;
             box-sizing: border-box;
+            gap: 15px;
         }
 
         header {
@@ -27,27 +27,26 @@
 
         h2 {
             margin: 0;
-            font-size: 20px;
+            font-size: 18px;
             color: #4cc9f0;
             letter-spacing: 1px;
         }
 
         .bussola-container {
             position: relative;
-            width: 220px;
-            height: 220px;
-            border: 6px solid #4cc9f0;
+            width: 180px;
+            height: 180px;
+            border: 5px solid #4cc9f0;
             border-radius: 50%;
             display: flex;
             justify-content: center;
             align-items: center;
             background: rgba(28, 37, 65, 0.8);
-            box-shadow: 0 0 25px rgba(76, 201, 240, 0.3);
-            margin: 10px 0;
+            box-shadow: 0 0 20px rgba(76, 201, 240, 0.3);
         }
 
         #graus {
-            font-size: 42px;
+            font-size: 36px;
             font-weight: bold;
             color: #ffcc00;
         }
@@ -56,21 +55,21 @@
             background-color: #1c2541;
             width: 100%;
             max-width: 340px;
-            padding: 15px;
-            border-radius: 12px;
+            padding: 12px;
+            border-radius: 10px;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 8px;
             border-left: 5px solid #4cc9f0;
         }
 
         .info-row {
             display: flex;
             justify-content: space-between;
-            font-size: 15px;
+            font-size: 14px;
             border-bottom: 1px solid #3a4a7f;
-            padding-bottom: 5px;
+            padding-bottom: 4px;
         }
 
         .info-row:last-child {
@@ -85,22 +84,58 @@
 
         .info-value {
             font-family: monospace;
-            font-size: 16px;
+            font-size: 15px;
             text-align: right;
+        }
+
+        /* Caixa do Histórico de Rastro */
+        .card-historico {
+            background-color: #1c2541;
+            width: 100%;
+            max-width: 340px;
+            padding: 12px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+            border-left: 5px solid #ffcc00;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .historico-titulo {
+            font-size: 14px;
+            color: #ffcc00;
+            font-weight: bold;
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #lista-trilha {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            font-family: monospace;
+            font-size: 12px;
+            color: #b0c4de;
+        }
+
+        #lista-trilha li {
+            padding: 3px 0;
+            border-bottom: 1px dashed #2a3b6c;
         }
 
         .btn-permissao {
             width: 100%;
             max-width: 340px;
-            padding: 15px;
+            padding: 12px;
             background-color: #4cc9f0;
             color: #0b132b;
             border: none;
             border-radius: 8px;
             font-weight: bold;
-            font-size: 18px;
+            font-size: 16px;
             cursor: pointer;
-            margin-top: 10px;
         }
 
         .btn-permissao:active {
@@ -108,11 +143,14 @@
             color: #fff;
         }
 
-        /* Pequena alteração para acomodar as duas velocidades */
-        #velocidade {
-            font-size: 14px;
-            /* Fonte um pouco menor para caber as duas linhas */
-            line-height: 1.4;
+        .btn-limpar {
+            background: none;
+            border: 1px solid #ffcc00;
+            color: #ffcc00;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            cursor: pointer;
         }
     </style>
 </head>
@@ -148,7 +186,18 @@
         </div>
     </div>
 
-    <!-- Botão de ativação de sensores (Exigido por alguns navegadores móveis) -->
+    <!-- Bloco do Histórico / Rastro de Navegação -->
+    <div class="card-historico">
+        <div class="historico-titulo">
+            <span>Rastro de Navegação (Trilha)</span>
+            <button class="btn-limpar" id="btn-limpar">Limpar</button>
+        </div>
+        <ul id="lista-trilha">
+            <li>Aguardando movimento...</li>
+        </ul>
+    </div>
+
+    <!-- Botão de ativação de sensores -->
     <button id="btn-ativar" class="btn-permissao">ATIVAR SENSORES & GPS</button>
 
     <script>
@@ -158,110 +207,130 @@
         const latText = document.getElementById('lat');
         const lonText = document.getElementById('lon');
         const btnAtivar = document.getElementById('btn-ativar');
+        const listaTrilha = document.getElementById('lista-trilha');
+        const btnLimpar = document.getElementById('btn-limpar');
 
-        // Função para converter graus em pontos cardeais
+        let trilhaNavegacao = []; // Array para guardar o histórico de pontos
+
         function obterPontoCardinal(graus) {
             const direcoes = ["Norte", "Nordeste", "Leste", "Sudeste", "Sul", "Sudoeste", "Oeste", "Noroeste"];
             const index = Math.round((graus % 360) / 45);
             return direcoes[index % 8];
         }
 
-        // Ativar sensores e geolocalização ao tocar no botão
+        // Botão para limpar o histórico de rastro
+        btnLimpar.addEventListener('click', () => {
+            trilhaNavegacao = [];
+            listaTrilha.innerHTML = '<li>Trilha limpa.</li>';
+        });
+
+        // Ativar sensores e geolocalização
         btnAtivar.addEventListener('click', () => {
             btnAtivar.innerText = 'Ativando...';
 
-            // 1. Permissão para Bússola / Orientação
+            // 1. Orientação / Bússola
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                DeviceOrientationEvent.requestPermission()
-                    .then(response => {
-                        if (response === 'granted') {
-                            iniciarBussola();
-                        } else {
-                            alert('Permissão de orientação negada pelo navegador.');
-                            direcaoCard.innerText = "Sem permissão";
-                        }
-                    }).catch(console.error);
+                DeviceOrientationEvent.requestPermission().then(response => {
+                    if (response === 'granted') iniciarBussola();
+                }).catch(console.error);
             } else {
-                // Androids geralmente não precisam de requestPermission explícito, apenas HTTPS
                 iniciarBussola();
             }
 
-            // 2. Ativar GPS (Geolocalização em tempo real)
+            // 2. GPS e Rastro de Navegação
             if ('geolocation' in navigator) {
                 navigator.geolocation.watchPosition((position) => {
-                    const latitude = position.coords.latitude.toFixed(5);
-                    const longitude = position.coords.longitude.toFixed(5);
-
-                    latText.innerText = latitude;
-                    lonText.innerText = longitude;
-
-                    // GPS fornece velocidade em metros por segundo (m/s)
+                    const latitude = position.coords.latitude;
+                    const longitude = position.coords.longitude;
                     const speed_ms = position.coords.speed;
 
-                    if (speed_ms !== null && speed_ms > 0) {
-                        // Converter m/s para Nós (m/s * 1.94384)
-                        const nos = (speed_ms * 1.94384).toFixed(1);
-                        // Converter m/s para Km/h (m/s * 3.6)
-                        const kmh = (speed_ms * 3.6).toFixed(1);
+                    const latFormatada = latitude.toFixed(5);
+                    const lonFormatada = longitude.toFixed(5);
 
+                    latText.innerText = latFormatada;
+                    lonText.innerText = lonFormatada;
+
+                    // Velocidade
+                    if (speed_ms !== null && speed_ms > 0) {
+                        const nos = (speed_ms * 1.94384).toFixed(1);
+                        const kmh = (speed_ms * 3.6).toFixed(1);
                         velocidadeText.innerHTML = `${nos} nós<br>${kmh} km/h`;
                     } else {
                         velocidadeText.innerHTML = "0.0 nós<br>0.0 km/h";
                     }
+
+                    // --- ADICIONANDO PONTO AO HISTÓRICO (Rastro) ---
+                    const agora = new Date();
+                    const horaFormatada = agora.toTimeString().split(' ')[0]; // Pega HH:MM:SS
+
+                    const novoPonto = {
+                        hora: horaFormatada,
+                        lat: latFormatada,
+                        lon: lonFormatada
+                    };
+
+                    // Evita duplicar exatamente o mesmo ponto consecutivo
+                    const ultimoPonto = trilhaNavegacao[trilhaNavegacao.length - 1];
+                    if (!ultimoPonto || ultimoPonto.lat !== latFormatada || ultimoPonto.lon !== lonFormatada) {
+                        trilhaNavegacao.push(novoPonto);
+
+                        // Mantém apenas os últimos 20 pontos na lista visual para não pesar a tela
+                        if (trilhaNavegacao.length > 20) {
+                            trilhaNavegacao.shift();
+                        }
+
+                        // Atualiza a lista na tela
+                        atualizarListaTrilha();
+                    }
+
                 }, (error) => {
                     console.error(error);
-                    if (error.code === error.PERMISSION_DENIED) {
-                        alert("Você negou o acesso ao GPS. O painel de velocidade e coordenadas não funcionará.");
-                        latText.innerText = "GPS Negado";
-                    } else {
-                        latText.innerText = "Erro no GPS";
-                    }
+                    latText.innerText = "Erro GPS";
                 }, {
-                    enableHighAccuracy: true, // Força o uso do GPS de alta precisão (consome mais bateria)
-                    maximumAge: 1000,         // Tenta pegar posição nova a cada segundo
-                    timeout: 5000             // Dá 5 segundos para achar o satélite
+                    enableHighAccuracy: true,
+                    maximumAge: 1000,
+                    timeout: 5000
                 });
             } else {
-                alert('Geolocalização não suportada neste aparelho.');
+                alert('Geolocalização não suportada.');
             }
 
-            btnAtivar.style.display = 'none'; // Esconde o botão após ativar
-            document.querySelector('.card-info').style.display = 'flex'; // Garante que o card apareça
+            btnAtivar.style.display = 'none';
         });
 
-        // Ouvinte da Bússola
+        function atualizarListaTrilha() {
+            listaTrilha.innerHTML = '';
+            // Mostra do mais recente para o mais antigo
+            [...trilhaNavegacao].reverse().forEach(ponto => {
+                const li = document.createElement('li');
+                li.innerText = `[${ponto.hora}] Lat:${ponto.lat} Lon:${ponto.lon}`;
+                listaTrilha.appendChild(li);
+            });
+        }
+
         function iniciarBussola() {
-            // Verifica se o navegador suporta a API de orientação
             if ('ondeviceorientationabsolute' in window) {
                 window.addEventListener('deviceorientationabsolute', tratarOrientacao, true);
             } else if ('ondeviceorientation' in window) {
                 window.addEventListener('deviceorientation', tratarOrientacao, true);
-            } else {
-                direcaoCard.innerText = "Sensor não suportado";
             }
         }
 
         function tratarOrientacao(event) {
             let compass = event.webkitCompassHeading || event.alpha;
-
             if (compass !== null && compass !== undefined) {
-                // Ajusta para compasso de 0 a 360 graus (usando math.abs para garantir que não dê negativo)
                 let angulo = Math.round(360 - compass);
                 if (angulo >= 360) angulo = 0;
                 if (angulo < 0) angulo = Math.abs(angulo);
 
                 grausText.innerText = `${angulo}°`;
                 direcaoCard.innerText = obterPontoCardinal(angulo);
-            } else {
-                direcaoCard.innerText = "Calibrando...";
             }
         }
 
-        // Registro do Service Worker para PWA
+        // Service Worker
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js')
-                .then(() => console.log("SW registrado"))
-                .catch((err) => console.log("Erro SW:", err));
+            navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
         }
     </script>
 </body>
