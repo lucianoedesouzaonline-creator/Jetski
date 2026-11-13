@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bússola & Painel Náutico</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #0b132b;
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+
+        header {
+            text-align: center;
+        }
+
+        h2 {
+            margin: 0;
+            font-size: 20px;
+            color: #4cc9f0;
+            letter-spacing: 1px;
+        }
+
+        .bussola-container {
+            position: relative;
+            width: 220px;
+            height: 220px;
+            border: 6px solid #4cc9f0;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(28, 37, 65, 0.8);
+            box-shadow: 0 0 25px rgba(76, 201, 240, 0.3);
+        }
+
+        #graus {
+            font-size: 42px;
+            font-weight: bold;
+            color: #ffcc00;
+        }
+
+        .card-info {
+            background-color: #1c2541;
+            width: 100%;
+            max-width: 340px;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            border-left: 5px solid #4cc9f0;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 15px;
+        }
+
+        .info-label {
+            color: #90e0ef;
+            font-weight: bold;
+        }
+
+        .info-value {
+            font-family: monospace;
+            font-size: 16px;
+        }
+
+        .btn-permissao {
+            width: 100%;
+            max-width: 340px;
+            padding: 12px;
+            background-color: #4cc9f0;
+            color: #0b132b;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .btn-permissao:active {
+            background-color: #3a86ff;
+            color: #fff;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h2>PAINEL NÁUTICO PWA</h2>
+    </header>
+
+    <!-- Visor da Bússola -->
+    <div class="bussola-container">
+        <div id="graus">--°</div>
+    </div>
+
+    <!-- Bloco de Dados do GPS e Sensores -->
+    <div class="card-info">
+        <div class="info-row">
+            <span class="info-label">Direção:</span>
+            <span id="direcao-card" class="info-value">Aguardando...</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Velocidade:</span>
+            <span id="velocidade" class="info-value">0.0 nós</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Latitude:</span>
+            <span id="lat" class="info-value">--</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Longitude:</span>
+            <span id="lon" class="info-value">--</span>
+        </div>
+    </div>
+
+    <!-- Botão de ativação de sensores (Exigido por alguns navegadores móveis) -->
+    <button id="btn-ativar" class="btn-permissao">ATIVAR SENSORES & GPS</button>
+
+    <script>
+        const grausText = document.getElementById('graus');
+        const direcaoCard = document.getElementById('direcao-card');
+        const velocidadeText = document.getElementById('velocidade');
+        const latText = document.getElementById('lat');
+        const lonText = document.getElementById('lon');
+        const btnAtivar = document.getElementById('btn-ativar');
+
+        // Função para converter graus em pontos cardeais (N, NE, E, SE, S, SO, O, NO)
+        function obterPontoCardinal(graus) {
+            const direcoes = ["Norte", "Nordeste", "Leste", "Sudeste", "Sul", "Sudoeste", "Oeste", "Noroeste"];
+            const index = Math.round((graus % 360) / 45);
+            return direcoes[index % 8];
+        }
+
+        // Ativar sensores e geolocalização ao tocar no botão
+        btnAtivar.addEventListener('click', () => {
+            // 1. Permissão para Bússola / Orientação (Dispositivos modernos)
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission()
+                    .then(response => {
+                        if (response === 'granted') {
+                            iniciarBussola();
+                        } else {
+                            alert('Permissão de orientação negada.');
+                        }
+                    }).catch(console.error);
+            } else {
+                iniciarBussola();
+            }
+
+            // 2. Ativar GPS (Geolocalização em tempo real)
+            if ('geolocation' in navigator) {
+                navigator.geolocation.watchPosition((position) => {
+                    const latitude = position.coords.latitude.toFixed(5);
+                    const longitude = position.coords.longitude.toFixed(5);
+
+                    latText.innerText = latitude;
+                    lonText.innerText = longitude;
+
+                    // Velocidade vem em metros por segundo. Convertemos para Nós (1 m/s = 1.94384 nós) ou Km/h (* 3.6)
+                    if (position.coords.speed !== null && position.coords.speed >= 0) {
+                        const nos = (position.coords.speed * 1.94384).toFixed(1);
+                        velocidadeText.innerText = `${nos} nós`;
+                    } else {
+                        velocidadeText.innerText = "0.0 nós";
+                    }
+                }, (error) => {
+                    console.error(error);
+                    latText.innerText = "Erro GPS";
+                }, {
+                    enableHighAccuracy: true,
+                    maximumAge: 1000,
+                    timeout: 5000
+                });
+            } else {
+                alert('Geolocalização não suportada neste aparelho.');
+            }
+
+            btnAtivar.style.display = 'none'; // Esconde o botão após ativar
+        });
+
+        // Ouvinte da Bússola
+        function iniciarBussola() {
+            window.addEventListener('deviceorientation', (event) => {
+                let compass = event.webkitCompassHeading || event.alpha;
+
+                if (compass !== null && compass !== undefined) {
+                    // Ajusta para compasso de 0 a 360 graus
+                    let angulo = Math.round(360 - compass);
+                    if (angulo === 360) angulo = 0;
+
+                    grausText.innerText = `${angulo}°`;
+                    direcaoCard.innerText = obterPontoCardinal(angulo);
+                }
+            }, true);
+        }
+
+        // Registro do Service Worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js')
+                .then(() => console.log("Service Worker Náutico registrado!"))
+                .catch((err) => console.log("Erro no SW:", err));
+        }
+    </script>
+</body>
+
+</html>
