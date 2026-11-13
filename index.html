@@ -43,6 +43,7 @@
             align-items: center;
             background: rgba(28, 37, 65, 0.8);
             box-shadow: 0 0 25px rgba(76, 201, 240, 0.3);
+            margin: 10px 0;
         }
 
         #graus {
@@ -60,7 +61,7 @@
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 10px;
             border-left: 5px solid #4cc9f0;
         }
 
@@ -68,6 +69,13 @@
             display: flex;
             justify-content: space-between;
             font-size: 15px;
+            border-bottom: 1px solid #3a4a7f;
+            padding-bottom: 5px;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
         }
 
         .info-label {
@@ -78,24 +86,33 @@
         .info-value {
             font-family: monospace;
             font-size: 16px;
+            text-align: right;
         }
 
         .btn-permissao {
             width: 100%;
             max-width: 340px;
-            padding: 12px;
+            padding: 15px;
             background-color: #4cc9f0;
             color: #0b132b;
             border: none;
             border-radius: 8px;
             font-weight: bold;
-            font-size: 16px;
+            font-size: 18px;
             cursor: pointer;
+            margin-top: 10px;
         }
 
         .btn-permissao:active {
             background-color: #3a86ff;
             color: #fff;
+        }
+
+        /* Pequena alteração para acomodar as duas velocidades */
+        #velocidade {
+            font-size: 14px;
+            /* Fonte um pouco menor para caber as duas linhas */
+            line-height: 1.4;
         }
     </style>
 </head>
@@ -119,7 +136,7 @@
         </div>
         <div class="info-row">
             <span class="info-label">Velocidade:</span>
-            <span id="velocidade" class="info-value">0.0 nós</span>
+            <span id="velocidade" class="info-value">0.0 nós<br>0.0 km/h</span>
         </div>
         <div class="info-row">
             <span class="info-label">Latitude:</span>
@@ -142,7 +159,7 @@
         const lonText = document.getElementById('lon');
         const btnAtivar = document.getElementById('btn-ativar');
 
-        // Função para converter graus em pontos cardeais (N, NE, E, SE, S, SO, O, NO)
+        // Função para converter graus em pontos cardeais
         function obterPontoCardinal(graus) {
             const direcoes = ["Norte", "Nordeste", "Leste", "Sudeste", "Sul", "Sudoeste", "Oeste", "Noroeste"];
             const index = Math.round((graus % 360) / 45);
@@ -151,17 +168,21 @@
 
         // Ativar sensores e geolocalização ao tocar no botão
         btnAtivar.addEventListener('click', () => {
-            // 1. Permissão para Bússola / Orientação (Dispositivos modernos)
+            btnAtivar.innerText = 'Ativando...';
+
+            // 1. Permissão para Bússola / Orientação
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                 DeviceOrientationEvent.requestPermission()
                     .then(response => {
                         if (response === 'granted') {
                             iniciarBussola();
                         } else {
-                            alert('Permissão de orientação negada.');
+                            alert('Permissão de orientação negada pelo navegador.');
+                            direcaoCard.innerText = "Sem permissão";
                         }
                     }).catch(console.error);
             } else {
+                // Androids geralmente não precisam de requestPermission explícito, apenas HTTPS
                 iniciarBussola();
             }
 
@@ -174,49 +195,73 @@
                     latText.innerText = latitude;
                     lonText.innerText = longitude;
 
-                    // Velocidade vem em metros por segundo. Convertemos para Nós (1 m/s = 1.94384 nós) ou Km/h (* 3.6)
-                    if (position.coords.speed !== null && position.coords.speed >= 0) {
-                        const nos = (position.coords.speed * 1.94384).toFixed(1);
-                        velocidadeText.innerText = `${nos} nós`;
+                    // GPS fornece velocidade em metros por segundo (m/s)
+                    const speed_ms = position.coords.speed;
+
+                    if (speed_ms !== null && speed_ms > 0) {
+                        // Converter m/s para Nós (m/s * 1.94384)
+                        const nos = (speed_ms * 1.94384).toFixed(1);
+                        // Converter m/s para Km/h (m/s * 3.6)
+                        const kmh = (speed_ms * 3.6).toFixed(1);
+
+                        velocidadeText.innerHTML = `${nos} nós<br>${kmh} km/h`;
                     } else {
-                        velocidadeText.innerText = "0.0 nós";
+                        velocidadeText.innerHTML = "0.0 nós<br>0.0 km/h";
                     }
                 }, (error) => {
                     console.error(error);
-                    latText.innerText = "Erro GPS";
+                    if (error.code === error.PERMISSION_DENIED) {
+                        alert("Você negou o acesso ao GPS. O painel de velocidade e coordenadas não funcionará.");
+                        latText.innerText = "GPS Negado";
+                    } else {
+                        latText.innerText = "Erro no GPS";
+                    }
                 }, {
-                    enableHighAccuracy: true,
-                    maximumAge: 1000,
-                    timeout: 5000
+                    enableHighAccuracy: true, // Força o uso do GPS de alta precisão (consome mais bateria)
+                    maximumAge: 1000,         // Tenta pegar posição nova a cada segundo
+                    timeout: 5000             // Dá 5 segundos para achar o satélite
                 });
             } else {
                 alert('Geolocalização não suportada neste aparelho.');
             }
 
             btnAtivar.style.display = 'none'; // Esconde o botão após ativar
+            document.querySelector('.card-info').style.display = 'flex'; // Garante que o card apareça
         });
 
         // Ouvinte da Bússola
         function iniciarBussola() {
-            window.addEventListener('deviceorientation', (event) => {
-                let compass = event.webkitCompassHeading || event.alpha;
-
-                if (compass !== null && compass !== undefined) {
-                    // Ajusta para compasso de 0 a 360 graus
-                    let angulo = Math.round(360 - compass);
-                    if (angulo === 360) angulo = 0;
-
-                    grausText.innerText = `${angulo}°`;
-                    direcaoCard.innerText = obterPontoCardinal(angulo);
-                }
-            }, true);
+            // Verifica se o navegador suporta a API de orientação
+            if ('ondeviceorientationabsolute' in window) {
+                window.addEventListener('deviceorientationabsolute', tratarOrientacao, true);
+            } else if ('ondeviceorientation' in window) {
+                window.addEventListener('deviceorientation', tratarOrientacao, true);
+            } else {
+                direcaoCard.innerText = "Sensor não suportado";
+            }
         }
 
-        // Registro do Service Worker
+        function tratarOrientacao(event) {
+            let compass = event.webkitCompassHeading || event.alpha;
+
+            if (compass !== null && compass !== undefined) {
+                // Ajusta para compasso de 0 a 360 graus (usando math.abs para garantir que não dê negativo)
+                let angulo = Math.round(360 - compass);
+                if (angulo >= 360) angulo = 0;
+                if (angulo < 0) angulo = Math.abs(angulo);
+
+                grausText.innerText = `${angulo}°`;
+                direcaoCard.innerText = obterPontoCardinal(angulo);
+            } else {
+                direcaoCard.innerText = "Calibrando...";
+            }
+        }
+
+        // Registro do Service Worker para PWA
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js')
-                .then(() => console.log("Service Worker Náutico registrado!"))
-                .catch((err) => console.log("Erro no SW:", err));
+                .then(() => console.log("SW registrado"))
+                .catch((err) => console.log("Erro SW:", err));
         }
     </script>
 </body>
