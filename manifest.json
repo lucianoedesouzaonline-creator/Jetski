@@ -1,10 +1,11 @@
 {
-    "name": "Bússola Náutica PWA",
-    "short_name": "Bússola Náutica",
+    "name": "Painel Náutico PWA",
+    "short_name": "Painel Náutico",
     "start_url": "./index.html",
-    "display": "standalone",
+    "display": "fullscreen",
+    "orientation": "portrait",
     "background_color": "#0b132b",
-    "theme_color": "#1c2541",
+    "theme_color": "#0b132b",
     "icons": [
         {
             "src": "icon-192.png",

@@ -3,7 +3,13 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Meta tags para garantir tela cheia real no Android/iOS -->
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
     <title>Bússola & Painel Náutico</title>
     <link rel="manifest" href="manifest.json">
     <style>
@@ -12,17 +18,37 @@
             background-color: #0b132b;
             color: #ffffff;
             margin: 0;
-            padding: 10px;
+            padding: 0;
             display: flex;
             flex-direction: column;
             align-items: center;
-            min-height: 100vh;
+            justify-content: space-between;
+            height: 100vh;
+            width: 100vw;
             box-sizing: border-box;
-            gap: 10px;
+            overflow: hidden;
+            /* Impede rolagem do corpo */
+            position: relative;
+            overscroll-behavior: none;
+            /* Impede efeito 'pull-to-refresh' */
         }
 
+        /* Header Customizado (Tela Limpa - Sem barras Android) */
         header {
             text-align: center;
+            width: 100%;
+            position: absolute;
+            /* Fica sobre o conteúdo */
+            top: 10px;
+            /* Margem segura do topo real */
+            z-index: 500;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 15px;
+            box-sizing: border-box;
+            pointer-events: none;
+            /* Permite clicar através se necessário, mas os botões terão pointer-events: auto */
         }
 
         h2 {
@@ -30,16 +56,45 @@
             font-size: 16px;
             color: #4cc9f0;
             letter-spacing: 1px;
+            opacity: 0.9;
+            pointer-events: auto;
         }
 
+        /* Botões Flutuantes Superiores */
+        .btn-float {
+            pointer-events: auto;
+            background: rgba(28, 37, 65, 0.9);
+            border: 2px solid #4cc9f0;
+            color: #4cc9f0;
+            font-size: 13px;
+            padding: 5px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            backdrop-filter: blur(5px);
+        }
+
+        .btn-pausa {
+            border-color: #ff4d4d;
+            color: #ff4d4d;
+        }
+
+        .btn-pausa.pausado {
+            background-color: #ff4d4d;
+            color: #ffffff;
+            border-color: #fff;
+        }
+
+        /* Área Principal: Bússola + Radar */
         .painel-topo {
             display: flex;
-            gap: 12px;
+            gap: 15px;
             width: 100%;
-            max-width: 400px;
+            max-width: 450px;
             justify-content: center;
             align-items: center;
-            flex-wrap: wrap;
+            margin-top: 60px;
+            /* Espaço para o header */
         }
 
         /* Bússola (Esquerda) */
@@ -53,20 +108,20 @@
             justify-content: center;
             align-items: center;
             background: rgba(28, 37, 65, 0.8);
-            box-shadow: 0 0 10px rgba(76, 201, 240, 0.3);
+            box-shadow: 0 0 15px rgba(76, 201, 240, 0.4);
             flex-shrink: 0;
         }
 
         #graus {
-            font-size: 26px;
+            font-size: 32px;
             font-weight: bold;
             color: #ffcc00;
         }
 
-        /* Radar de Trilha (Direita) - Clicável para Zoom */
+        /* Radar de Trilha (Direita - Gigante) */
         .radar-container {
-            width: 180px;
-            height: 180px;
+            width: 190px;
+            height: 190px;
             background: #1c2541;
             border: 4px solid #4cc9f0;
             border-radius: 50%;
@@ -76,61 +131,9 @@
             align-items: center;
             overflow: hidden;
             flex-shrink: 0;
-            box-shadow: 0 0 15px rgba(76, 201, 240, 0.3);
+            box-shadow: 0 0 25px rgba(76, 201, 240, 0.5);
             cursor: pointer;
             transition: all 0.3s ease;
-        }
-
-        /* Estado de Zoom Total na Tela */
-        .radar-container.zoom-ativo {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 90vw;
-            height: 90vw;
-            max-width: 380px;
-            max-height: 380px;
-            z-index: 1000;
-            border-width: 6px;
-            box-shadow: 0 0 40px rgba(76, 201, 240, 0.8);
-        }
-
-        /* Fundo escuro quando o zoom estiver ativo */
-        .overlay-zoom {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.85);
-            z-index: 999;
-        }
-
-        .overlay-zoom.ativo {
-            display: block;
-        }
-
-        /* Horário flutuante no Zoom */
-        .horario-zoom {
-            display: none;
-            position: absolute;
-            top: 15px;
-            right: 20px;
-            background: #1c2541;
-            padding: 6px 12px;
-            border-radius: 6px;
-            border: 2px solid #ffcc00;
-            font-family: monospace;
-            font-size: 16px;
-            color: #ffcc00;
-            font-weight: bold;
-            z-index: 1001;
-        }
-
-        .radar-container.zoom-ativo~.horario-zoom {
-            display: block;
         }
 
         canvas {
@@ -138,21 +141,73 @@
             height: 100%;
         }
 
+        /* Estado de Zoom Total do Radar */
+        .radar-container.zoom-ativo {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 95vmin;
+            height: 95vmin;
+            max-width: 400px;
+            max-height: 400px;
+            z-index: 1000;
+            border-width: 6px;
+        }
+
+        .overlay-zoom {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 999;
+        }
+
+        .overlay-zoom.ativo {
+            display: block;
+        }
+
+        /* Horário Flutuante no Zoom */
+        .horario-zoom {
+            display: none;
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            background: rgba(28, 37, 65, 0.9);
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 2px solid #ffcc00;
+            font-family: monospace;
+            font-size: 18px;
+            color: #ffcc00;
+            font-weight: bold;
+            z-index: 1001;
+            pointer-events: none;
+        }
+
+        .radar-container.zoom-ativo~.horario-zoom {
+            display: block;
+        }
+
         /* Controles de Modo: Volta (Esquerda) / Ida (Direita) */
         .controles-trilha {
             display: flex;
-            gap: 8px;
+            gap: 12px;
             width: 100%;
             max-width: 400px;
+            margin-bottom: 15px;
         }
 
         .btn-modo {
             flex: 1;
-            padding: 10px;
+            padding: 14px;
             border: none;
-            border-radius: 6px;
+            border-radius: 8px;
             font-weight: bold;
-            font-size: 13px;
+            font-size: 14px;
             cursor: pointer;
             opacity: 0.6;
         }
@@ -167,22 +222,70 @@
             color: #0b132b;
         }
 
-        .ativo {
+        .btn-modo.ativo {
             opacity: 1 !important;
-            box-shadow: 0 0 8px #ffffff;
+            box-shadow: 0 0 10px #ffffff;
+        }
+
+        /* GAVETA LATERAL DESLIZANTE (Menu de Dados & Histórico Expandido) */
+        .gaveta-lateral {
+            position: fixed;
+            top: 0;
+            left: -100%;
+            /* Escondida */
+            width: 85%;
+            max-width: 360px;
+            height: 100%;
+            background-color: #0b132b;
+            /* Fundo escuro sólido */
+            box-shadow: 5px 0 25px rgba(0, 0, 0, 0.9);
+            z-index: 2000;
+            transition: left 0.3s ease-in-out;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            box-sizing: border-box;
+            gap: 20px;
+            overflow-y: auto;
+            /* Permite scroll se o conteúdo for grande */
+        }
+
+        .gaveta-lateral.aberta {
+            left: 0;
+        }
+
+        .gaveta-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #4cc9f0;
+            padding-bottom: 10px;
+        }
+
+        .gaveta-header h3 {
+            margin: 0;
+            color: #4cc9f0;
+            font-size: 16px;
+        }
+
+        .btn-fechar-gaveta {
+            background: none;
+            border: none;
+            color: #ff4d4d;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            padding: 0;
         }
 
         /* Card de Informações */
         .card-info {
             background-color: #1c2541;
-            width: 100%;
-            max-width: 400px;
-            padding: 12px;
-            border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+            padding: 15px;
+            border-radius: 10px;
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: 8px;
             border-left: 4px solid #4cc9f0;
         }
 
@@ -191,7 +294,7 @@
             justify-content: space-between;
             font-size: 14px;
             border-bottom: 1px solid #3a4a7f;
-            padding-bottom: 4px;
+            padding-bottom: 5px;
         }
 
         .info-row:last-child {
@@ -210,30 +313,28 @@
             text-align: right;
         }
 
-        /* Galeria de Miniaturas (Últimos 2 trajetos) */
+        /* Histórico Expandido (4 Miniaturas - Grade 2x2) */
         .card-miniaturas {
             background-color: #1c2541;
-            width: 100%;
-            max-width: 400px;
-            padding: 10px;
-            border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+            padding: 15px;
+            border-radius: 10px;
             border-left: 4px solid #ffcc00;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 10px;
         }
 
         .miniaturas-titulo {
-            font-size: 13px;
+            font-size: 14px;
             color: #ffcc00;
             font-weight: bold;
         }
 
-        .miniaturas-container {
-            display: flex;
-            gap: 10px;
-            justify-content: space-around;
+        .miniaturas-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            justify-items: center;
         }
 
         .miniatura-box {
@@ -252,33 +353,54 @@
             margin-bottom: 3px;
         }
 
-        /* Botão de Ativação */
-        .btn-permissao {
+        /* Botão Inicial de Ativação */
+        .btn-ativar-container {
+            position: fixed;
+            bottom: 20px;
+            left: 0;
             width: 100%;
+            display: flex;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .btn-permissao {
+            width: 90%;
             max-width: 400px;
-            padding: 14px;
+            padding: 16px;
             background-color: #4cc9f0;
             color: #0b132b;
             border: none;
-            border-radius: 8px;
+            border-radius: 12px;
             font-weight: bold;
-            font-size: 16px;
+            font-size: 18px;
             cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
         }
 
-        .btn-permissao:active {
-            background-color: #3a86ff;
-            color: #fff;
-        }
-
+        /* Media Query para Tablets (Modo Paisagem) */
         @media (min-width: 600px) {
-
-            .painel-topo,
-            .card-info,
-            .controles-trilha,
-            .card-miniaturas,
-            .btn-permissao {
+            .painel-topo {
                 max-width: 500px;
+                gap: 20px;
+            }
+
+            .bussola-container {
+                width: 150px;
+                height: 150px;
+            }
+
+            #graus {
+                font-size: 36px;
+            }
+
+            .radar-container {
+                width: 220px;
+                height: 220px;
+            }
+
+            .gaveta-lateral {
+                width: 400px;
             }
         }
     </style>
@@ -286,73 +408,84 @@
 
 <body>
 
+    <!-- Overlay para o Zoom do Radar -->
     <div class="overlay-zoom" id="overlayZoom"></div>
     <div class="horario-zoom" id="horarioZoom">--:--:--</div>
 
+    <!-- Header Customizado (Botão Menu e Pausa) -->
     <header>
-        <h2>PAINEL NÁUTICO PWA</h2>
+        <button class="btn-float" id="btnMenu">⚙️ DADOS</button>
+        <h2>PAINEL NÁUTICO</h2>
+        <button class="btn-float btn-pausa" id="btnPausa">⏸️ PAUSA</button>
     </header>
 
-    <!-- Bloco Superior: Bússola + Radar Gráfico -->
-    <div class="painel-topo">
-        <!-- Visor da Bússola -->
-        <div class="bussola-container" title="Bússola (Proa)">
-            <div id="graus">--°</div>
+    <!-- GAVETA LATERAL (Menu de Dados & Histórico Expandido) -->
+    <div class="gaveta-lateral" id="gavetaLateral">
+        <div class="gaveta-header">
+            <h3>PAINEL DE DADOS & HISTÓRICO</h3>
+            <button class="btn-fechar-gaveta" id="btnFecharGaveta">✕</button>
         </div>
 
-        <!-- Radar Gráfico (Toque para dar Zoom) -->
-        <div class="radar-container" id="radarContainer" title="Toque para ampliar o rastro">
-            <canvas id="radarCanvas" width="220" height="220"></canvas>
+        <!-- Card de Informações -->
+        <div class="card-info">
+            <div class="info-row">
+                <span class="info-label">Horário Atual:</span>
+                <span id="relogio" class="info-value">--:--:--</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Direção:</span>
+                <span id="direcao-card" class="info-value">Aguardando...</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Velocidade:</span>
+                <span id="velocidade" class="info-value">0.0 nós / 0.0 km/h</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Latitude:</span>
+                <span id="lat" class="info-value">--</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Longitude:</span>
+                <span id="lon" class="info-value">--</span>
+            </div>
+        </div>
+
+        <!-- Histórico Expandido (4 Miniaturas) -->
+        <div class="card-miniaturas">
+            <span class="miniaturas-titulo">Últimos Registros (Até 4 Passos):</span>
+            <div class="miniaturas-grid">
+                <div class="miniatura-box"><canvas id="mini1" width="80" height="80"></canvas><span
+                        id="label-mini1">Passo 1</span></div>
+                <div class="miniatura-box"><canvas id="mini2" width="80" height="80"></canvas><span
+                        id="label-mini2">Passo 2</span></div>
+                <div class="miniatura-box"><canvas id="mini3" width="80" height="80"></canvas><span
+                        id="label-mini3">Passo 3</span></div>
+                <div class="miniatura-box"><canvas id="mini4" width="80" height="80"></canvas><span
+                        id="label-mini4">Passo 4</span></div>
+            </div>
         </div>
     </div>
 
-    <!-- Botões de Alternância: Volta (Esquerda) / Ida (Direita) -->
+    <!-- Painel Principal: Bússola + Radar -->
+    <div class="painel-topo">
+        <div class="bussola-container" title="Bússola (Proa)">
+            <div id="graus">--°</div>
+        </div>
+        <div class="radar-container" id="radarContainer" title="Toque para ampliar o rastro">
+            <canvas id="radarCanvas" width="200" height="200"></canvas>
+        </div>
+    </div>
+
+    <!-- Botões de Alternância (Volta/Ida) -->
     <div class="controles-trilha">
         <button class="btn-modo" id="btn-volta">MODO: VOLTA</button>
         <button class="btn-modo ativo" id="btn-ida">MODO: IDA</button>
     </div>
 
-    <!-- Bloco de Dados do GPS, Horário e Sensores -->
-    <div class="card-info">
-        <div class="info-row">
-            <span class="info-label">Horário:</span>
-            <span id="relogio" class="info-value">--:--:--</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Direção:</span>
-            <span id="direcao-card" class="info-value">Aguardando...</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Velocidade:</span>
-            <span id="velocidade" class="info-value">0.0 nós / 0.0 km/h</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Latitude:</span>
-            <span id="lat" class="info-value">--</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Longitude:</span>
-            <span id="lon" class="info-value">--</span>
-        </div>
+    <!-- Botão Inicial de Ativação -->
+    <div class="btn-ativar-container" id="btnAtivarDiv">
+        <button id="btn-ativar" class="btn-permissao">ATIVAR SENSORES & GPS</button>
     </div>
-
-    <!-- Seção de Miniaturas (Últimos 2 Trechos Salvos) -->
-    <div class="card-miniaturas">
-        <span class="miniaturas-titulo">Últimos Registros (Até 2 Passos):</span>
-        <div class="miniaturas-container">
-            <div class="miniatura-box">
-                <canvas id="mini1" width="100" height="100"></canvas>
-                <span id="label-mini1">Passo 1: Vazio</span>
-            </div>
-            <div class="miniatura-box">
-                <canvas id="mini2" width="100" height="100"></canvas>
-                <span id="label-mini2">Passo 2: Vazio</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Botão de ativação de sensores -->
-    <button id="btn-ativar" class="btn-permissao">ATIVAR SENSORES & GPS</button>
 
     <script>
         const grausText = document.getElementById('graus');
@@ -363,63 +496,107 @@
         const relogioText = document.getElementById('relogio');
         const horarioZoom = document.getElementById('horarioZoom');
         const btnAtivar = document.getElementById('btn-ativar');
+        const btnAtivarDiv = document.getElementById('btnAtivarDiv');
         const btnIda = document.getElementById('btn-ida');
         const btnVolta = document.getElementById('btn-volta');
+        const btnMenu = document.getElementById('btnMenu');
+        const btnFecharGaveta = document.getElementById('btnFecharGaveta');
+        const gavetaLateral = document.getElementById('gavetaLateral');
+        const btnPausa = document.getElementById('btnPausa');
 
         const canvas = document.getElementById('radarCanvas');
         const ctx = canvas.getContext('2d');
         const radarContainer = document.getElementById('radarContainer');
         const overlayZoom = document.getElementById('overlayZoom');
 
-        // Miniaturas
-        const canvasMini1 = document.getElementById('mini1');
-        const ctxMini1 = canvasMini1.getContext('2d');
-        const labelMini1 = document.getElementById('label-mini1');
-
-        const canvasMini2 = document.getElementById('mini2');
-        const ctxMini2 = canvasMini2.getContext('2d');
-        const labelMini2 = document.getElementById('label-mini2');
+        const ctxMinis = [
+            document.getElementById('mini1').getContext('2d'),
+            document.getElementById('mini2').getContext('2d'),
+            document.getElementById('mini3').getContext('2d'),
+            document.getElementById('mini4').getContext('2d')
+        ];
+        const labelMinis = [
+            document.getElementById('label-mini1'),
+            document.getElementById('label-mini2'),
+            document.getElementById('label-mini3'),
+            document.getElementById('label-mini4')
+        ];
 
         let modoAtual = 'ida';
         let trilhaIda = [];
         let trilhaVolta = [];
         let pontoInicial = null;
-        let historicoPassos = []; // Guarda os últimos 2 trajetos
+        let historicoPassos = [];
+        let watchID = null; // ID para gerenciar o GPS
+        let compassEvent = null; // Evento da bússola
 
         // Relógio em tempo real
-        setInterval(() => {
+        const relogioInterval = setInterval(() => {
             const agora = new Date();
             const horaStr = agora.toTimeString().split(' ')[0];
             relogioText.innerText = horaStr;
             horarioZoom.innerText = horaStr;
         }, 1000);
 
-        // Lógica de Zoom ao clicar no radar
+        // Funções de Gaveta
+        btnMenu.addEventListener('click', () => gavetaLateral.classList.add('aberta'));
+        btnFecharGaveta.addEventListener('click', () => gavetaLateral.classList.remove('aberta'));
+
+        // Função de Pausa / Desligar Recursos
+        let sistemaPausado = false;
+        btnPausa.addEventListener('click', () => {
+            sistemaPausado = !sistemaPausado;
+            if (sistemaPausado) {
+                btnPausa.innerText = "▶️ RETOMAR";
+                btnPausa.classList.add('pausado');
+                // "Desliga" os recursos (remove listeners)
+                if (watchID) navigator.geolocation.clearWatch(watchID);
+                window.removeEventListener('deviceorientationabsolute', tratarOrientacao);
+                window.removeEventListener('deviceorientation', tratarOrientacao);
+                // Garante que o rastro pare
+                pontoInicial = null;
+            } else {
+                btnPausa.innerText = "⏸️ PAUSA";
+                btnPausa.classList.remove('pausado');
+                // "Liga" os recursos (reinicia listeners)
+                iniciarSensores();
+                // O rastro vai começar do zero novamente a partir daqui (comportamento esperado)
+            }
+        });
+
+        // Zoom no Radar
         radarContainer.addEventListener('click', () => {
             radarContainer.classList.toggle('zoom-ativo');
             overlayZoom.classList.toggle('ativo');
+            desenharRadar(); // Redesenha no tamanho apropriado
         });
         overlayZoom.addEventListener('click', () => {
             radarContainer.classList.remove('zoom-ativo');
             overlayZoom.classList.remove('ativo');
+            desenharRadar(); // Redesenha no tamanho original
         });
 
-        // Alternar Ida / Volta e salvar o passo anterior no histórico
+        // Alternar Modo (Ida/Volta)
         function registrarTrechoConcluido() {
-            if (trilhaIda.length > 2 || trilhaVolta.length > 2) {
+            if (trilhaIda.length > 3 || trilhaVolta.length > 3) { // Só salva se houver movimento real
+                const agora = new Date();
                 const novoPasso = {
                     tipo: modoAtual.toUpperCase(),
                     ida: [...trilhaIda],
                     volta: [...trilhaVolta],
-                    hora: new Date().toTimeString().split(' ')[0].substring(0, 5)
+                    hora: agora.toTimeString().split(' ')[0].substring(0, 5)
                 };
 
-                historicoPassos.unshift(novoPasso); // Adiciona no começo
-                if (historicoPassos.length > 2) {
-                    historicoPassos.pop(); // Mantém no máximo 2
+                historicoPassos.unshift(novoPasso);
+                if (historicoPassos.length > 4) {
+                    historicoPassos.pop();
                 }
                 atualizarMiniaturas();
             }
+            // Reseta a trilha atual ao mudar de sentido
+            trilhaIda = [];
+            trilhaVolta = [];
+            pontoInicial = null;
         }
 
         btnIda.addEventListener('click', () => {
@@ -442,124 +619,142 @@
             return direcoes[index % 8];
         }
 
-        // Desenhar Radar Principal
+        // Desenhar Radar (Principal e Miniaturas)
         function desenharRadar() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Define o tamanho de desenho baseado no estado de zoom
+            const isZoomed = radarContainer.classList.contains('zoom-ativo');
+            const currentCanvas = canvas;
+            const currentCtx = ctx;
+            const size = isZoomed ? Math.min(window.innerWidth, window.innerHeight) * 0.9 : 200;
+            const center = size / 2;
+            const radiusScale = size / 2.2;
 
-            ctx.fillStyle = '#1c2541';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            currentCanvas.width = size;
+            currentCanvas.height = size;
 
-            ctx.strokeStyle = '#3a4a7f';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.arc(110, 110, 80, 0, Math.PI * 2);
-            ctx.stroke();
+            currentCtx.clearRect(0, 0, size, size);
+            currentCtx.fillStyle = '#1c2541';
+            currentCtx.fillRect(0, 0, size, size);
 
-            // Trilha de Ida (Amarela) com marca de INÍCIO
+            currentCtx.strokeStyle = '#3a4a7f';
+            currentCtx.lineWidth = 1;
+            currentCtx.beginPath();
+            currentCtx.arc(center, center, radiusScale * 0.8, 0, Math.PI * 2);
+            currentCtx.stroke();
+
+            // Trilha de Ida (Amarela)
             if (trilhaIda.length > 0) {
-                ctx.strokeStyle = '#ffcc00';
-                ctx.lineWidth = 4;
-                ctx.beginPath();
+                currentCtx.strokeStyle = '#ffcc00';
+                currentCtx.lineWidth = isZoomed ? 4 : 3;
+                currentCtx.beginPath();
                 trilhaIda.forEach((p, index) => {
-                    if (index === 0) ctx.moveTo(p.x, p.y);
-                    else ctx.lineTo(p.x, p.y);
+                    // Reajusta coordenadas para o tamanho do canvas atual
+                    const sx = center + (p.dx * 2.0 * (size / 200));
+                    const sy = center - (p.dy * 2.0 * (size / 200));
+                    if (index === 0) currentCtx.moveTo(sx, sy);
+                    else currentCtx.lineTo(sx, sy);
                 });
-                ctx.stroke();
+                currentCtx.stroke();
 
-                // Ponto de Início (Verde)
-                ctx.fillStyle = '#00ffcc';
-                ctx.beginPath();
-                ctx.arc(trilhaIda[0].x, trilhaIda[0].y, 5, 0, Math.PI * 2);
-                ctx.fill();
+                // Ponto de Início (Verde Ciano)
+                const startSx = center + (trilhaIda[0].dx * 2.0 * (size / 200));
+                const startSy = center - (trilhaIda[0].dy * 2.0 * (size / 200));
+                currentCtx.fillStyle = '#00ffcc';
+                currentCtx.beginPath();
+                currentCtx.arc(startSx, startSy, isZoomed ? 6 : 4, 0, Math.PI * 2);
+                currentCtx.fill();
             }
 
             // Trilha de Volta (Vinho)
             if (trilhaVolta.length > 1) {
-                ctx.strokeStyle = '#800020';
-                ctx.lineWidth = 4;
-                ctx.beginPath();
+                currentCtx.strokeStyle = '#800020';
+                currentCtx.lineWidth = isZoomed ? 4 : 3;
+                currentCtx.beginPath();
                 trilhaVolta.forEach((p, index) => {
-                    if (index === 0) ctx.moveTo(p.x, p.y);
-                    else ctx.lineTo(p.x, p.y);
+                    const sx = center + (p.dx * 2.0 * (size / 200));
+                    const sy = center - (p.dy * 2.0 * (size / 200));
+                    if (index === 0) currentCtx.moveTo(sx, sy);
+                    else currentCtx.lineTo(sx, sy);
                 });
-                ctx.stroke();
+                currentCtx.stroke();
             }
 
-            // Ponto central de referência atual
-            ctx.fillStyle = '#4cc9f0';
-            ctx.beginPath();
-            ctx.arc(110, 110, 5, 0, Math.PI * 2);
-            ctx.fill();
+            // Ponto central de referência (Sua Posição Atual)
+            currentCtx.fillStyle = '#4cc9f0';
+            currentCtx.beginPath();
+            currentCtx.arc(center, center, isZoomed ? 6 : 4, 0, Math.PI * 2);
+            currentCtx.fill();
         }
 
-        // Renderizar miniaturas dos 2 últimos passos
         function desenharMiniTrilha(targetCtx, passo) {
-            targetCtx.clearRect(0, 0, 100, 100);
+            const miniSize = 80;
+            targetCtx.clearRect(0, 0, miniSize, miniSize);
             targetCtx.fillStyle = '#0b132b';
-            targetCtx.fillRect(0, 0, 100, 100);
+            targetCtx.fillRect(0, 0, miniSize, miniSize);
 
             if (!passo) return;
 
-            // Desenhar Ida na miniatura
-            if (passo.ida && passo.ida.length > 1) {
-                targetCtx.strokeStyle = '#ffcc00';
-                targetCtx.lineWidth = 2;
-                targetCtx.beginPath();
-                passo.ida.forEach((p, idx) => {
-                    // Reajusta escala para caber no canvas 100x100
-                    const mx = 50 + (p.x - 110) * 0.4;
-                    const my = 50 + (p.y - 110) * 0.4;
-                    if (idx === 0) targetCtx.moveTo(mx, my);
-                    else targetCtx.lineTo(mx, my);
-                });
-                targetCtx.stroke();
+            function drawPath(points, color) {
+                if (points.length > 1) {
+                    targetCtx.strokeStyle = color;
+                    targetCtx.lineWidth = 2;
+                    targetCtx.beginPath();
+                    points.forEach((p, idx) => {
+                        // Escala fixa para o canvas 80x80
+                        const mx = 40 + (p.dx * 0.35);
+                        const my = 40 - (p.dy * 0.35);
+                        if (idx === 0) targetCtx.moveTo(mx, my);
+                        else targetCtx.lineTo(mx, my);
+                    });
+                    targetCtx.stroke();
+                }
             }
+            drawPath(passo.ida, '#ffcc00');
+            drawPath(passo.volta, '#800020');
 
-            // Desenhar Volta na miniatura
-            if (passo.volta && passo.volta.length > 1) {
-                targetCtx.strokeStyle = '#800020';
-                targetCtx.lineWidth = 2;
-                targetCtx.beginPath();
-                passo.volta.forEach((p, idx) => {
-                    const mx = 50 + (p.x - 110) * 0.4;
-                    const my = 50 + (p.y - 110) * 0.4;
-                    if (idx === 0) targetCtx.moveTo(mx, my);
-                    else targetCtx.lineTo(mx, my);
-                });
-                targetCtx.stroke();
-            }
+            // Ponto central
+            targetCtx.fillStyle = '#4cc9f0';
+            targetCtx.beginPath();
+            targetCtx.arc(40, 40, 3, 0, Math.PI * 2);
+            targetCtx.fill();
         }
 
         function atualizarMiniaturas() {
-            if (historicoPassos[0]) {
-                desenharMiniTrilha(ctxMini1, historicoPassos[0]);
-                labelMini1.innerText = `${historicoPassos[0].hora} (${historicoPassos[0].tipo})`;
-            } else {
-                labelMini1.innerText = "Passo 1: Vazio";
-            }
-
-            if (historicoPassos[1]) {
-                desenharMiniTrilha(ctxMini2, historicoPassos[1]);
-                labelMini2.innerText = `${historicoPassos[1].hora} (${historicoPassos[1].tipo})`;
-            } else {
-                labelMini2.innerText = "Passo 2: Vazio";
+            for (let i = 0; i < 4; i++) {
+                if (historicoPassos[i]) {
+                    desenharMiniTrilha(ctxMinis[i], historicoPassos[i]);
+                    labelMinis[i].innerText = `${historicoPassos[i].hora} (${historicoPassos[i].tipo})`;
+                } else {
+                    ctxMinis[i].clearRect(0, 0, 80, 80);
+                    labelMinis[i].innerText = `Passo ${i + 1}: Vazio`;
+                }
             }
         }
 
-        // Ativação de GPS e Sensores
-        btnAtivar.addEventListener('click', () => {
-            btnAtivar.innerText = 'Ativando...';
-
+        // Inicialização de Sensores
+        function iniciarSensores() {
+            // Permissão Bússola (iOS)
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                DeviceOrientationEvent.requestPermission().then(response => {
-                    if (response === 'granted') iniciarBussola();
-                }).catch(console.error);
+                DeviceOrientationEvent.requestPermission()
+                    .then(response => {
+                        if (response === 'granted') {
+                            window.addEventListener('deviceorientation', tratarOrientacao, true);
+                        } else { alert('Permissão de bússola negada.'); }
+                    }).catch(console.error);
             } else {
-                iniciarBussola();
+                // Android
+                if ('ondeviceorientationabsolute' in window) {
+                    window.addEventListener('deviceorientationabsolute', tratarOrientacao, true);
+                } else if ('ondeviceorientation' in window) {
+                    window.addEventListener('deviceorientation', tratarOrientacao, true);
+                } else { alert('Orientação não suportada.'); }
             }
 
+            // Geolocalização e Rastro
             if ('geolocation' in navigator) {
-                navigator.geolocation.watchPosition((position) => {
+                watchID = navigator.geolocation.watchPosition((position) => {
+                    if (sistemaPausado) return;
+
                     const lat = position.coords.latitude;
                     const lon = position.coords.longitude;
                     const speed_ms = position.coords.speed;
@@ -575,65 +770,77 @@
                         velocidadeText.innerText = "0.0 nós / 0.0 km/h";
                     }
 
+                    // Cálculo do rastro gráfico
                     if (!pontoInicial) {
                         pontoInicial = { lat: lat, lon: lon };
                     }
 
+                    // Diferença em metros (aproximada)
                     const deltaLat = (lat - pontoInicial.lat) * 111000;
                     const deltaLon = (lon - pontoInicial.lon) * 111000 * Math.cos(lat * Math.PI / 180);
 
-                    const escala = 2.0;
-                    const xCoord = 110 + (deltaLon * escala);
-                    const yCoord = 110 - (deltaLat * escala);
-
-                    const novoPontoCanvas = { x: xCoord, y: yCoord };
+                    const novoPontoCanvas = { dx: deltaLon, dy: deltaLat };
 
                     if (modoAtual === 'ida') {
                         trilhaIda.push(novoPontoCanvas);
+                        if (trilhaIda.length > 500) trilhaIda.shift(); // Limita tamanho
                     } else {
                         trilhaVolta.push(novoPontoCanvas);
+                        if (trilhaVolta.length > 500) trilhaVolta.shift();
                     }
 
                     desenharRadar();
 
                 }, (error) => {
                     console.error(error);
-                    latText.innerText = "Erro GPS";
+                    if (error.code === error.PERMISSION_DENIED) {
+                        latText.innerText = "GPS Negado";
+                        btnAtivarDiv.style.display = 'flex';
+                    } else { latText.innerText = "Erro no GPS"; }
                 }, {
-                    enableHighAccuracy: true,
+                    enableHighAccuracy: true, // Crucial para precisão náutica
                     maximumAge: 1000,
                     timeout: 5000
                 });
-            } else {
-                alert('Geolocalização não suportada.');
-            }
-
-            btnAtivar.style.display = 'none';
-            desenharRadar();
-        });
-
-        function iniciarBussola() {
-            if ('ondeviceorientationabsolute' in window) {
-                window.addEventListener('deviceorientationabsolute', tratarOrientacao, true);
-            } else if ('ondeviceorientation' in window) {
-                window.addEventListener('deviceorientation', tratarOrientacao, true);
-            }
+            } else { alert('Geolocalização não suportada.'); }
         }
 
         function tratarOrientacao(event) {
+            if (sistemaPausado) return;
+            // webkitCompassHeading é para iOS, alpha é para Android
             let compass = event.webkitCompassHeading || event.alpha;
+
             if (compass !== null && compass !== undefined) {
+                // Magnetômetro no Android retorna Alpha, que precisa ser normalizado
                 let angulo = Math.round(360 - compass);
                 if (angulo >= 360) angulo = 0;
                 if (angulo < 0) angulo = Math.abs(angulo);
 
                 grausText.innerText = `${angulo}°`;
                 direcaoCard.innerText = obterPontoCardinal(angulo);
+            } else {
+                grausText.innerText = "Calib...";
             }
         }
 
+        // Botão de Ativação
+        btnAtivar.addEventListener('click', () => {
+            btnAtivar.innerText = 'Ativando...';
+            btnAtivar.style.opacity = '0.7';
+
+            iniciarSensores();
+
+            // Esconde o botão após a tentativa de ativação
+            setTimeout(() => {
+                btnAtivarDiv.style.display = 'none';
+            }, 1500);
+        });
+
+        // Service Worker para Offline
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
+            navigator.serviceWorker.register('sw.js')
+                .then(() => console.log("Service Worker Náutico registrado."))
+                .catch((err) => console.log("Erro SW:", err));
         }
     </script>
 </body>
