@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b132b">
+<title>Painel Náutico</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<style>
+:root{--bg:#0b132b;--card:#16213f;--line:#3a4a7f;--cy:#4cc9f0;--ye:#ffcc00;--pk:#ff5fa2;--rd:#ff5252;--gr:#2ee6a8;--mt:#8fd8ee}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:#fff;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+body{min-height:100vh;padding:10px 12px calc(16px + env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:center;gap:10px}
+.w{width:100%;max-width:420px}
+header{display:flex;justify-content:space-between;align-items:center}
+h1{margin:0;font-size:16px;font-weight:600;color:var(--cy)}
+button{font:inherit;border:0;border-radius:12px;font-weight:700;color:var(--bg);padding:15px 8px;font-size:14px}
+button:active{filter:brightness(.8)}
+button:focus-visible{outline:3px solid #fff;outline-offset:2px}
+#bPausa{padding:6px 12px;font-size:13px;background:none;border:2px solid var(--rd);color:var(--rd)}
+#bPausa.on{background:var(--rd);color:#fff}
+#bAtivar{background:var(--cy);font-size:16px}
+.radar{width:100%;max-width:380px;aspect-ratio:1;margin:0 auto}
+canvas{width:100%;height:100%;display:block;border-radius:50%;background:var(--card);border:4px solid var(--cy)}
+#estado{background:var(--card);border-left:4px solid var(--ye);border-radius:10px;padding:9px 12px;font-size:13px;color:var(--mt)}
+.guia{display:none;align-items:center;gap:14px;background:var(--card);border-left:4px solid var(--cy);border-radius:10px;padding:10px 14px}
+.guia.on{display:flex}
+#seta{width:70px;height:70px;flex:none;transition:transform .25s linear}
+.guia b{display:block;font-size:28px;font-variant-numeric:tabular-nums}
+.guia small{display:block;color:var(--mt);font-size:13px;line-height:1.5}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.k{background:var(--card);border-radius:10px;padding:8px 12px}
+.k span{display:block;font-size:12px;color:var(--mt)}
+.k b{font-size:18px;font-variant-numeric:tabular-nums}
+.row{display:flex;gap:8px}
+.row button{flex:1}
+#bIda{background:var(--ye)}
+#bVolta{background:var(--cy)}
+#bIda.on,#bVolta.on{background:#fff;box-shadow:0 0 0 3px var(--gr)}
+#bLimpar{background:none;border:2px solid var(--line);color:var(--mt);padding:10px;font-size:13px}
+</style>
+</head>
+<body>
+<header class="w"><h1>Painel Náutico</h1><button id="bPausa">Pausar</button></header>
+
+<div class="radar"><canvas id="radar"></canvas></div>
+
+<div class="guia w" id="guia">
+  <svg id="seta" viewBox="-50 -50 100 100"><polygon points="0,-44 30,32 0,17 -30,32" fill="#4cc9f0"/></svg>
+  <div><b id="gDist">--</b><small id="gTxt">--</small></div>
+</div>
+
+<div class="w" id="estado">Toque em Ativar GPS para começar.</div>
+
+<div class="grid w">
+  <div class="k"><span>Velocidade</span><b id="vel">0.0 nós</b></div>
+  <div class="k"><span>Rumo</span><b id="rumo">--</b></div>
+  <div class="k"><span>Latitude</span><b id="lat">--</b></div>
+  <div class="k"><span>Longitude</span><b id="lon">--</b></div>
+  <div class="k"><span>Precisão do GPS</span><b id="prec">--</b></div>
+  <div class="k"><span>Km/h</span><b id="kmh">0.0</b></div>
+</div>
+
+<button class="w" id="bAtivar">Ativar GPS</button>
+<div class="row w">
+  <button id="bIda">● Gravar ida</button>
+  <button id="bVolta">↩ Voltar pelo caminho</button>
+</div>
+<button class="w" id="bLimpar">Apagar trilha salva</button>
+
+<script>
+const $ = id => document.getElementById(id);
+const KEY = 'painel-nautico-trilha-v2', R2D = 180 / Math.PI;
+const NICE = [50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000];
+
+// Estado persistente: pontos reais {lat, lon, t}, nunca pixels.
+let st = { ida: [], volta: [], mode: 'parado', idx: 0 };
+try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && Array.isArray(s.ida)) st = s; } catch (e) {}
+
+let route = [], rem = [], pos = null, heading = 0, hMag = null, hGps = null;
+let pausado = false, ativo = false, wake = null, lastSave = 0, dIda = 0, dirty = false;
+
+// ---------- Geometria (plano local em metros, centrado em r) ----------
+const xy = (p, r) => ({ x: (p.lon - r.lon) * Math.cos(r.lat / R2D) * 111320, y: (p.lat - r.lat) * 110540 });
+const dist = (a, b) => { const v = xy(b, a); return Math.hypot(v.x, v.y); };
+const fmt = m => m < 1000 ? Math.round(m) + ' m' : (m / 1000).toFixed(2) + ' km';
+const cardeal = g => ['N', 'NE', 'L', 'SE', 'S', 'SO', 'O', 'NO'][Math.round(g / 45) % 8];
+
+function salvar(force) {
+    const n = Date.now();
+    if (!force && n - lastSave < 4000) return;
+    lastSave = n;
+    try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {}
+}
+
+function somarIda() {
+    dIda = 0;
+    for (let i = 1; i < st.ida.length; i++) dIda += dist(st.ida[i - 1], st.ida[i]);
+}
+
+// A volta é a ida invertida, com pontos espaçados a cada 15 m.
+function montarRota() {
+    route = [];
+    for (let i = st.ida.length - 1; i >= 0; i--) {
+        const p = st.ida[i];
+        if (!route.length || dist(route[route.length - 1], p) >= 15) route.push(p);
+    }
+    const origem = st.ida[0];
+    if (route.length && dist(route[route.length - 1], origem) > 1) route.push(origem);
+    rem = new Array(route.length).fill(0);
+    for (let i = route.length - 2; i >= 0; i--) rem[i] = rem[i + 1] + dist(route[i], route[i + 1]);
+}
+
+somarIda();
+if (st.mode === 'volta') montarRota();
+
+// ---------- GPS ----------
+function onPos(g) {
+    const c = g.coords;
+    pos = { lat: +c.latitude.toFixed(6), lon: +c.longitude.toFixed(6), acc: c.accuracy, t: g.timestamp };
+    $('lat').textContent = pos.lat.toFixed(5);
+    $('lon').textContent = pos.lon.toFixed(5);
+    $('prec').textContent = '±' + Math.round(c.accuracy) + ' m';
+    const v = c.speed || 0;
+    $('vel').textContent = (v * 1.94384).toFixed(1) + ' nós';
+    $('kmh').textContent = (v * 3.6).toFixed(1);
+    // Em movimento o rumo do GPS é mais confiável que a bússola do celular.
+    hGps = (c.speed != null && c.speed >= 1.5 && c.heading != null && !isNaN(c.heading)) ? c.heading : null;
+    if (!pausado && c.accuracy <= 30) registrar();
+    atualizar();
+}
+
+function registrar() {
+    const minimo = () => Math.max(5, pos.acc * 0.5);
+    if (st.mode === 'ida') {
+        const a = st.ida[st.ida.length - 1];
+        if (a) {
+            const d = dist(a, pos), dt = (pos.t - a.t) / 1000;
+            if (d < minimo()) return;                    // ruído parado
+            if (dt > 0 && d / dt > 45) return;           // salto impossível (>45 m/s)
+            dIda += d;
+        }
+        st.ida.push({ lat: pos.lat, lon: pos.lon, t: pos.t });
+        salvar();
+    } else if (st.mode === 'volta') {
+        const a = st.volta[st.volta.length - 1];
+        if (!a || dist(a, pos) >= minimo()) st.volta.push({ lat: pos.lat, lon: pos.lon, t: pos.t });
+        avancar();
+        salvar();
+    }
+}
+
+// Avança o ponto-alvo quando o barco chega perto dele (ou de um dos próximos 5).
+function avancar() {
+    if (!route.length || !pos) return;
+    const alcance = Math.max(15, pos.acc * 1.5);
+    const fim = Math.min(st.idx + 6, route.length);
+    for (let k = st.idx; k < fim; k++) if (dist(pos, route[k]) <= alcance) st.idx = k + 1;
+}
+
+// ---------- Bússola ----------
+function ori(e) {
+    if (e.alpha == null) return;
+    if (e.type === 'deviceorientation' && e.absolute !== true) return;
+    hMag = (360 - e.alpha) % 360;
+    pedir();
+}
+function pedir() { if (!dirty) { dirty = true; requestAnimationFrame(() => { dirty = false; atualizar(); }); } }
+
+// ---------- Interface ----------
+function atualizar() {
+    const alvo = hGps != null ? hGps : hMag;
+    if (alvo != null) {
+        const d = ((alvo - heading + 540) % 360) - 180;
+        heading = (heading + d * 0.3 + 360) % 360;
+        $('rumo').textContent = Math.round(heading) + '° ' + cardeal(heading);
+    }
+    guiar();
+    desenhar();
+}
+
+function guiar() {
+    const g = $('guia');
+    if (st.mode !== 'volta' || !pos || !route.length) { g.classList.remove('on'); return; }
+    g.classList.add('on');
+    if (st.idx >= route.length) {
+        $('gDist').textContent = 'Chegou';
+        $('gTxt').textContent = 'Você completou o caminho de volta.';
+        return;
+    }
+    const alvo = route[st.idx], v = xy(alvo, pos), d = Math.hypot(v.x, v.y);
+    const brg = (Math.atan2(v.x, v.y) * R2D + 360) % 360;
+    const rel = ((brg - heading + 540) % 360) - 180;
+    $('seta').style.transform = 'rotate(' + rel.toFixed(0) + 'deg)';
+    $('gDist').textContent = fmt(d);
+    let txt = 'Faltam ' + fmt(d + rem[st.idx]) + ' até a saída';
+    if (st.idx > 0) {                                    // desvio lateral em relação ao trecho atual
+        const a = xy(route[st.idx - 1], pos), b = v, abx = b.x - a.x, aby = b.y - a.y, l2 = abx * abx + aby * aby;
+        if (l2 > 1) {
+            const t = Math.max(0, Math.min(1, -(a.x * abx + a.y * aby) / l2));
+            const off = Math.hypot(a.x + t * abx, a.y + t * aby);
+            const lado = (abx * -a.y - aby * -a.x) > 0 ? 'esquerda' : 'direita';
+            txt += '<br>Desvio: ' + Math.round(off) + ' m à ' + lado + ' do caminho';
+        }
+    }
+    $('gTxt').innerHTML = txt;
+}
+
+const cv = $('radar'), cx = cv.getContext('2d');
+function desenhar() {
+    const S = Math.round(cv.clientWidth * (window.devicePixelRatio || 1));
+    if (S && cv.width !== S) cv.width = cv.height = S;
+    const W = cv.width, c = W / 2, u = W / 380;
+    cx.clearRect(0, 0, W, W);
+    cx.textAlign = 'center';
+    if (!pos) { cx.fillStyle = '#8fd8ee'; cx.font = 16 * u + 'px system-ui'; cx.fillText('Aguardando sinal do GPS', c, c); return; }
+
+    // Pontos que definem o zoom: ida inteira ao gravar; trecho restante ao voltar.
+    const base = st.mode === 'volta' ? route.slice(Math.max(0, st.idx - 1)) : st.ida;
+    const passo = Math.max(1, Math.ceil(base.length / 1200));
+    let maxd = 0;
+    for (let i = 0; i < base.length; i += passo) maxd = Math.max(maxd, dist(pos, base[i]));
+    const alcance = NICE.find(n => n >= maxd * 1.1) || 100000;
+    const k = (c * 0.86) / alcance, h = heading / R2D, ch = Math.cos(h), sh = Math.sin(h);
+    const proj = p => { const v = xy(p, pos); return [c + (v.x * ch - v.y * sh) * k, c - (v.x * sh + v.y * ch) * k]; };
+    const linha = (arr, cor, w) => {
+        if (arr.length < 2) return;
+        const s = Math.max(1, Math.ceil(arr.length / 1500));
+        cx.strokeStyle = cor; cx.lineWidth = w * u; cx.lineJoin = 'round'; cx.beginPath();
+        for (let i = 0; i < arr.length; i += s) { const [x, y] = proj(arr[i]); i ? cx.lineTo(x, y) : cx.moveTo(x, y); }
+        const [x, y] = proj(arr[arr.length - 1]); cx.lineTo(x, y); cx.stroke();
+    };
+
+    cx.strokeStyle = '#3a4a7f'; cx.lineWidth = 1 * u; cx.fillStyle = '#6f82bd'; cx.font = 12 * u + 'px system-ui';
+    [0.5, 1].forEach(f => { cx.beginPath(); cx.arc(c, c, c * 0.86 * f, 0, 7); cx.stroke(); });
+    cx.fillText(fmt(alcance), c, c - c * 0.86 - 4 * u);
+
+    linha(st.ida, st.mode === 'volta' ? 'rgba(255,204,0,.35)' : '#ffcc00', 3);
+    if (st.mode === 'volta') {
+        linha(route.slice(Math.max(0, st.idx - 1)), '#4cc9f0', 4);
+        linha(st.volta, '#ff5fa2', 2.5);
+        if (st.idx < route.length) { const [x, y] = proj(route[st.idx]); cx.strokeStyle = '#2ee6a8'; cx.lineWidth = 3 * u; cx.beginPath(); cx.arc(x, y, 9 * u, 0, 7); cx.stroke(); }
+    }
+    if (st.ida.length) { const [x, y] = proj(st.ida[0]); cx.fillStyle = '#2ee6a8'; cx.beginPath(); cx.arc(x, y, 5 * u, 0, 7); cx.fill(); }
+
+    // Norte
+    const na = -h, R = c * 0.94;
+    cx.fillStyle = '#ff5252'; cx.font = 'bold ' + 15 * u + 'px system-ui';
+    cx.fillText('N', c + Math.sin(na) * R, c - Math.cos(na) * R + 5 * u);
+
+    // Barco (sempre no centro, proa para cima)
+    cx.fillStyle = '#fff'; cx.strokeStyle = '#4cc9f0'; cx.lineWidth = 2 * u;
+    cx.beginPath(); cx.moveTo(c, c - 15 * u); cx.lineTo(c + 10 * u, c + 11 * u); cx.lineTo(c, c + 6 * u); cx.lineTo(c - 10 * u, c + 11 * u); cx.closePath(); cx.fill(); cx.stroke();
+}
+
+function ui() {
+    const nome = { parado: 'Parado', ida: 'Gravando a ida', volta: 'Seguindo o caminho de volta' }[st.mode];
+    $('estado').textContent = (pausado ? 'Pausado · ' : '') + nome + ' · ' + st.ida.length + ' pontos · ida ' + fmt(dIda);
+    $('bIda').textContent = st.mode === 'ida' ? '■ Parar ida' : '● Gravar ida';
+    $('bVolta').textContent = st.mode === 'volta' ? '■ Parar volta' : '↩ Voltar pelo caminho';
+    $('bIda').classList.toggle('on', st.mode === 'ida');
+    $('bVolta').classList.toggle('on', st.mode === 'volta');
+    $('bPausa').classList.toggle('on', pausado);
+    $('bPausa').textContent = pausado ? 'Retomar' : 'Pausar';
+}
+
+// ---------- Ações ----------
+async function wl() { try { wake = await navigator.wakeLock.request('screen'); } catch (e) {} }
+
+function ativar() {
+    if (ativo) return;
+    ativo = true; $('bAtivar').style.display = 'none';
+    navigator.geolocation.watchPosition(onPos, e => {
+        $('estado').textContent = e.code === 1 ? 'Permissão de localização negada. Libere o GPS nas configurações do navegador.' : 'Sem sinal de GPS. Procure céu aberto.';
+    }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
+    addEventListener('ondeviceorientationabsolute' in window ? 'deviceorientationabsolute' : 'deviceorientation', ori, true);
+    wl(); ui();
+}
+
+$('bAtivar').onclick = ativar;
+$('bPausa').onclick = () => { pausado = !pausado; ui(); };
+
+$('bIda').onclick = () => {
+    ativar();
+    if (st.mode === 'ida') { st.mode = 'parado'; }
+    else {
+        if (st.ida.length > 1 && !confirm('Já existe uma ida salva. Apagar e gravar uma nova?')) return;
+        st = { ida: [], volta: [], mode: 'ida', idx: 0 }; route = []; dIda = 0;
+    }
+    salvar(true); ui(); atualizar();
+};
+
+$('bVolta').onclick = () => {
+    ativar();
+    if (st.mode === 'volta') { st.mode = 'parado'; }
+    else {
+        if (st.ida.length < 2) { $('estado').textContent = 'Grave uma ida antes de voltar.'; return; }
+        st.mode = 'volta'; st.volta = []; st.idx = 0; montarRota(); avancar();
+    }
+    salvar(true); ui(); atualizar();
+};
+
+$('bLimpar').onclick = () => {
+    if (!confirm('Apagar a trilha salva?')) return;
+    st = { ida: [], volta: [], mode: 'parado', idx: 0 }; route = []; dIda = 0;
+    salvar(true); ui(); atualizar();
+};
+
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') { if (ativo) wl(); } else salvar(true);
+});
+addEventListener('pagehide', () => salvar(true));
+addEventListener('resize', desenhar);
+
+// Se o GPS já foi autorizado antes, liga sozinho.
+if (navigator.permissions) navigator.permissions.query({ name: 'geolocation' }).then(r => { if (r.state === 'granted') ativar(); }).catch(() => {});
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+ui(); desenhar();
+</script>
+</body>
+</html>
